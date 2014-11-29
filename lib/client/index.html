@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>EmberShare</title>
+</head>
+<body>
+Hello
+<script src="client.js"></script>
+<script>
+	var primus = Primus.connect('ws://' + window.location.host);
+
+sharejs.Connection.prototype.bindToSocket = function(socket) {
+  if (this.socket) {
+    delete this.socket.onopen;
+    delete this.socket.onclose;
+    delete this.socket.onmessage;
+    delete this.socket.onerror;
+  }
+
+  // TODO: Check that the socket is in the 'connecting' state.
+
+  this.socket = socket;
+
+  this.socket.send = this.socket.write;
+  // This logic is replicated in setState - consider calling setState here
+  // instead.
+  this.state = (socket.readyState === 0 || socket.readyState === 1) ? 'connecting' : 'disconnected';
+  this.canSend = this.state === 'connecting' && socket.canSendWhileConnecting;
+
+  var connection = this
+
+  socket.on('data', function(msg) {
+    var data = msg.data;
+
+    // Fall back to supporting old browserchannel 1.x API which implemented the
+    // websocket API incorrectly. This will be removed at some point
+    if (!data) data = msg;
+    
+    // Some transports don't need parsing.
+    if (typeof data === 'string') data = JSON.parse(data);
+
+    if (connection.debug) console.log('RECV', JSON.stringify(data));
+
+    connection.messageBuffer.push({
+      t: (new Date()).toTimeString(),
+      recv:JSON.stringify(data)
+    });
+    while (connection.messageBuffer.length > 100) {
+      connection.messageBuffer.shift();
+    }
+
+    try {
+      connection.handleMessage(data);
+    } catch (e) {
+      connection.emit('error', e);
+      // We could also restart the connection here, although that might result
+      // in infinite reconnection bugs.
+      throw e;
+    }
+  });
+
+  socket.on('open', function() {
+    connection._setState('connecting');
+  });
+
+  socket.on('error', function(e) {
+    // This isn't the same as a regular error, because it will happen normally
+    // from time to time. Your connection should probably automatically
+    // reconnect anyway, but that should be triggered off onclose not onerror.
+    // (onclose happens when onerror gets called anyway).
+    connection.emit('connection error', e);
+  });
+
+  socket.on('close', function(reason) {
+    connection._setState('disconnected', reason);
+    if (reason === 'Closed' || reason === 'Stopped by server') {
+      connection._setState('stopped', reason);
+    }
+  });
+};
+
+
+	// Primus.prototype.send = Primus.prototype.write;
+	var share = new sharejs.Connection(primus);
+
+	var doc = share.get('users', 'seph');
+
+	// Subscribe to changes
+	doc.subscribe();
+
+	// This will be called when we have a live copy of the server's data.
+	doc.whenReady(function() {
+	  console.log('doc ready, data: ', doc.getSnapshot());
+
+	  // Create a JSON document with value x:5
+	  if (!doc.type) doc.create('json0', {x:5});
+	});
+
+	setTimeout(function() {
+		// later, add 10 to the doc.snapshot.x property
+		doc.submitOp([{p:['x'], na:10}]);
+	}, 1000);
+</script>
+</body>
+</html>

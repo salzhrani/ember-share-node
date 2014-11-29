@@ -1,0 +1,21 @@
+{
+  "name": "ember-share-node",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "connect": "^3.3.3",
+    "hoek": "^2.10.0",
+    "livedb": "^0.4.9",
+    "primus": "^2.4.12",
+    "serve-static": "^1.7.1",
+    "share": "^0.7.3",
+    "uglify-js": "^2.4.15",
+    "ws": "^0.5.0"
+  }
+}
